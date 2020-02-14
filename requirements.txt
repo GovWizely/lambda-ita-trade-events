@@ -3,3 +3,5 @@ requests
 boto3
 datetime
 bs4
+openpyxl
+uuid

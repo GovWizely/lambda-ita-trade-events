@@ -1,7 +1,9 @@
 # ITA Trade Events Lambda
 
-This project provides an AWS Lambda that creates a single JSON document from the XML endpoint 
-at [http://emenuapps.ita.doc.gov/ePublic/GetEventXML?StartDT={0}&EndDT={1}](http://emenuapps.ita.doc.gov/ePublic/GetEventXML?StartDT={0}&EndDT={1}) .
+This project provides an AWS Lambda that creates a single JSON document from two sources:
+* the XML endpoint at [http://emenuapps.ita.doc.gov/ePublic/GetEventXML?StartDT={0}&EndDT={1}](http://emenuapps.ita.doc.gov/ePublic/GetEventXML?StartDT={0}&EndDT={1})  
+* an Excel spreadsheet of Trade Events Partnership Program (TEPP) events in the S3 bucket  
+
 It uploads that JSON file to a S3 bucket.
 
 ## Prerequisites
