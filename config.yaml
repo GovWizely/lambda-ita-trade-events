@@ -4,6 +4,7 @@ function_name: ita_trade_events
 handler: service.handler
 role: lambda_api
 description: Fetches trade events, builds a single JSON document, and stores it in S3
+runtime: python3.7
 
 # if access key and secret are left blank, boto will use the credentials
 # defined in the [default] section of ~/.aws/credentials.
