@@ -23,8 +23,8 @@ s3 = boto3.client('s3')
 def handler(event, context):  
     entries = get_concat_events()
     try:
-        s3.put_object(Bucket=BUCKET, Body=json.dumps(entries), Key='ita_tepp_concat.json', ContentType='application/json')
-        print(" ✅ Uploaded ita_tepp_concat.json file with %i trade events" % len(entries))
+        s3.put_object(Bucket=BUCKET, Body=json.dumps(entries), Key='ita.json', ContentType='application/json')
+        print(" ✅ Uploaded ita.json file with %i trade events" % len(entries))
     except ClientError as e:
         logging.error(e)
         return False
