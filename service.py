@@ -5,7 +5,7 @@ import requests
 import datetime as dt
 from bs4 import BeautifulSoup
 import openpyxl
-import uuid
+import hashlib
 from io import BytesIO
 import logging
 from botocore.exceptions import ClientError
@@ -164,6 +164,11 @@ def get_venue_info(row):
   venue['country'] = row[get_headers()['event_country']]
   return venue
 
+def generate_event_id(row):
+  m = hashlib.sha1()
+  unique_list = [ row[get_headers()['event_name']], convert_date(row, 'event_start_date'), convert_date(row, 'event_end_date'), row[get_headers()['event_location']] ]
+  m.update("".join(unique_list).encode())
+  return m.hexdigest()
 
 def get_tepp_events():
   """
@@ -174,7 +179,7 @@ def get_tepp_events():
   worksheet = get_tepp_worksheet()
   for row in worksheet.iter_rows(min_row=2, values_only=True):
     event = {}
-    event['eventid'] = uuid.uuid4().__str__() # no corresponding column, but we need this because ITA events have an eventid from eMenu
+    event['eventid'] = generate_event_id(row)
     event['industries'] = [row[get_headers()['primary_industry']]] # as array to match ITA events
     event['evenddt'] = convert_date(row, 'event_end_date')
     event['url'] = row[get_headers()['org_website']]
