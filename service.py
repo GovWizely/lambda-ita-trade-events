@@ -142,14 +142,32 @@ def get_headers():
 
 
 def convert_date(row, date_col):
-  return dt.datetime.strptime(str(row[get_headers()[date_col]]), '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
+  # Allow TypeError to resolve as "None", since that means the field is empty.
+  # ValueError should still fail, because that means the date was formatted incorrectly and we want to fix it.
+  try:
+      return dt.datetime.strptime(str(row[get_headers()[date_col]]), '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
+  except TypeError:
+      return None
+
+
+def get_first_name(row):
+    try:
+        return row[get_headers()['contact_name']].partition(' ')[0]
+    except AttributeError:
+        return None
+
+def get_last_name(row):
+    try:
+        return row[get_headers()['contact_name']].partition(' ')[-1]
+    except AttributeError:
+        return None
 
 
 def get_contact_info(row):
   contact = {}
-  contact['firstname'] = row[get_headers()['contact_name']].partition(' ')[0]
+  contact['firstname'] = get_first_name(row)
   contact['title'] = None # no corresponding column
-  contact['lastname'] = row[get_headers()['contact_name']].partition(' ')[-1]
+  contact['lastname'] = get_last_name(row)
   contact['phone'] = row[get_headers()['contact_phone']]
   contact['post'] = row[get_headers()['org_city']]
   contact['email'] = row[get_headers()['contact_email']]
@@ -183,7 +201,7 @@ def get_tepp_events():
     event['industries'] = [row[get_headers()['primary_industry']]] # as array to match ITA events
     event['evenddt'] = convert_date(row, 'event_end_date')
     event['url'] = row[get_headers()['org_website']]
-    event['eventtype'] = row[get_headers()['event_type']]
+    event['eventtype'] = 'Trade Events Partnership Program' # Hardcoded to normalize for different abbreviations
     event['evstartdt'] = convert_date(row, 'event_start_date')
     event['registrationlink'] = row[get_headers()['registration_link']]
     event['contacts'] = [get_contact_info(row)] # as array to match ITA events
@@ -193,6 +211,7 @@ def get_tepp_events():
     event['cost'] = row[get_headers()['cost']]
     event['registrationtitle'] = row[get_headers()['registration_title']]
     events.append(event)
+  print("Found %i TEPP items in the spreadsheet" % len(events))
   return events
 
   
