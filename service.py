@@ -115,12 +115,6 @@ def get_soup(link):
     return soup
 
 
-"""
-Access the pre-processed Excel file from the s3 bucket.
-Generate a json array of events from the Excel file.
-Starting with the list of ITA events, concatenate the TEPP events.
-Upload the concatenated list to the s3 bucket.
-"""
 def get_tepp_worksheet():
   s3_response_object = s3.get_object(Bucket=BUCKET, Key='tepp_prepared.xlsx')
   response_body = s3_response_object['Body'].read()
@@ -128,10 +122,7 @@ def get_tepp_worksheet():
   return workbook['query']
 
 
-def get_headers():
-  """
-  Create a dictionary of column names
-  """
+def get_tepp_headers():
   worksheet = get_tepp_worksheet()
   headers = {}
   idx  = 0
@@ -142,51 +133,59 @@ def get_headers():
 
 
 def convert_date(row, date_col):
-  # Allow TypeError to resolve as "None", since that means the field is empty.
-  # ValueError should still fail, because that means the date was formatted incorrectly and we want to fix it.
+  """
+  Allow TypeError to resolve as "None", since that means the field is empty.
+  ValueError should still fail, because that means the date was formatted incorrectly and we want to fix it.
+  """
   try:
-      return dt.datetime.strptime(str(row[get_headers()[date_col]]), '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
+      return dt.datetime.strptime(str(row[get_tepp_headers()[date_col]]), '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d')
   except TypeError:
       return None
 
 
 def get_first_name(row):
     try:
-        return row[get_headers()['contact_name']].partition(' ')[0]
+        return row[get_tepp_headers()['contact_name']].partition(' ')[0]
     except AttributeError:
         return None
 
 def get_last_name(row):
     try:
-        return row[get_headers()['contact_name']].partition(' ')[-1]
+        return row[get_tepp_headers()['contact_name']].partition(' ')[-1]
     except AttributeError:
         return None
 
 
-def get_contact_info(row):
+def get_tepp_contact_info(row):
   contact = {}
   contact['firstname'] = get_first_name(row)
-  contact['title'] = None # no corresponding column
+  contact['title'] = None
   contact['lastname'] = get_last_name(row)
-  contact['phone'] = row[get_headers()['contact_phone']]
-  contact['post'] = row[get_headers()['org_city']]
-  contact['email'] = row[get_headers()['contact_email']]
+  contact['phone'] = row[get_tepp_headers()['contact_phone']]
+  contact['post'] = row[get_tepp_headers()['org_city']]
+  contact['email'] = row[get_tepp_headers()['contact_email']]
   return contact
 
 
-def get_venue_info(row):
+def get_tepp_venue_info(row):
   venue = {}
-  venue['city'] = row[get_headers()['event_city']]
-  venue['state'] = row[get_headers()['event_state']]
-  venue['location'] = row[get_headers()['event_location']]
-  venue['country'] = row[get_headers()['event_country']]
+  venue['city'] = row[get_tepp_headers()['event_city']]
+  venue['state'] = row[get_tepp_headers()['event_state']]
+  venue['location'] = row[get_tepp_headers()['event_location']]
+  venue['country'] = row[get_tepp_headers()['event_country']]
   return venue
 
 def generate_event_id(row):
   m = hashlib.sha1()
-  unique_list = [ row[get_headers()['event_name']], convert_date(row, 'event_start_date'), convert_date(row, 'event_end_date'), row[get_headers()['event_location']] ]
+  unique_list = [ row[get_tepp_headers()['event_name']], convert_date(row, 'event_start_date'), convert_date(row, 'event_end_date'), row[get_tepp_headers()['event_location']] ]
   m.update("".join(unique_list).encode())
   return m.hexdigest()
+
+def get_tepp_industry(row):
+  if row[get_tepp_headers()['primary_industry']]:
+    return [row[get_tepp_headers()['primary_industry']]]
+  else:
+    return []
 
 def get_tepp_events():
   """
@@ -198,24 +197,24 @@ def get_tepp_events():
   for row in worksheet.iter_rows(min_row=2, values_only=True):
     event = {}
     event['eventid'] = generate_event_id(row)
-    event['industries'] = [row[get_headers()['primary_industry']]] # as array to match ITA events
+    event['industries'] = get_tepp_industry(row)
     event['evenddt'] = convert_date(row, 'event_end_date')
-    event['url'] = row[get_headers()['org_website']]
-    event['eventtype'] = 'Trade Events Partnership Program' # Hardcoded to normalize for different abbreviations
+    event['url'] = row[get_tepp_headers()['org_website']]
+    event['eventtype'] = 'Trade Events Partnership Program'
     event['evstartdt'] = convert_date(row, 'event_start_date')
-    event['registrationlink'] = row[get_headers()['registration_link']]
-    event['contacts'] = [get_contact_info(row)] # as array to match ITA events
-    event['detaildesc'] = row[get_headers()['description']]
-    event['eventname'] = row[get_headers()['event_name']]
-    event['venues'] = [get_venue_info(row)] # as array to match ITA events
-    event['cost'] = row[get_headers()['cost']]
-    event['registrationtitle'] = row[get_headers()['registration_title']]
+    event['registrationlink'] = row[get_tepp_headers()['registration_link']]
+    event['contacts'] = [get_tepp_contact_info(row)]
+    event['detaildesc'] = row[get_tepp_headers()['description']]
+    event['eventname'] = row[get_tepp_headers()['event_name']]
+    event['venues'] = [get_tepp_venue_info(row)]
+    event['cost'] = row[get_tepp_headers()['cost']]
+    event['registrationtitle'] = row[get_tepp_headers()['registration_title']]
     events.append(event)
   print("Found %i TEPP items in the spreadsheet" % len(events))
   return events
 
   
 def get_concat_events():
-  concat_events = get_event_list() # start with the ITA event list
-  concat_events.extend(get_tepp_events()) # add each event
+  concat_events = get_event_list()
+  concat_events.extend(get_tepp_events())
   return concat_events
