@@ -1,4 +1,4 @@
-boto3==1.12.27
+boto3==1.12.32
 bs4==0.0.1
 DateTime==4.3
 openpyxl==3.0.3
