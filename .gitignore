@@ -1,4 +1,6 @@
 dist/
 service.pyc
-__pycache__/
+.idea
+.coverage
 __init__.pyc
+__pycache__/
