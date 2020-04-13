@@ -2,5 +2,5 @@ boto3==1.12.39
 bs4==0.0.1
 DateTime==4.3
 openpyxl==3.0.3
-python-lambda==11.6.1
+python-lambda==11.7.1
 requests==2.23.0
