@@ -1,12 +1,10 @@
 # -*- coding: utf-8 -*-
 import datetime as dt
-import hashlib
 import json
 import logging
-from io import BytesIO
 
 import boto3
-import openpyxl
+import msal
 import requests
 from botocore.exceptions import ClientError
 from bs4 import BeautifulSoup
@@ -132,121 +130,137 @@ def get_soup(link):
     return soup
 
 
-def get_tepp_worksheet():
-    s3_response_object = s3.get_object(Bucket=BUCKET, Key="tepp_export.xlsx")
-    response_body = s3_response_object["Body"].read()
-    workbook = openpyxl.load_workbook(BytesIO(response_body))
-    first_sheet = workbook.sheetnames[0]
-    return workbook[first_sheet]
+SCOPE = ["https://graph.microsoft.com/.default"]
+AUTHORITY = "https://login.microsoftonline.com/a1d183f2-6c7b-4d9a-b994-5f2f31b3f780"
+SHAREPOINT_ENDPOINT = (
+    "https://graph.microsoft.com/beta/sites/itaisinternationaltrade.sharepoint.com"
+    ",e3ca10b9-b2f5-4b4d-8e79-f9f941ce4e88,05699979-3835-44f6-9d66-304a643dfc8e/"
+    "lists/TEPP%20Applications?expand=columns,items(expand=fields)"
+)
+
+PERMITTED_STATUS = [
+    "MOA Received",
+    "Waiting on End of Show Report",
+    "Event Completed"
+]
 
 
-def get_tepp_headers():
-    worksheet = get_tepp_worksheet()
-    headers = {}
-    idx = 0
-    for COL in worksheet.iter_cols(1, worksheet.max_column):
-        headers[COL[0].value] = idx
-        idx += 1
-    return headers
+def get_sharepoint_secret():
+    """Get the Azure client secret from AWS"""
+    session = boto3.session.Session()
+    client = session.client(
+        service_name='secretsmanager',
+        region_name="us-east-1"
+    )
+    get_secret_value_response = client.get_secret_value(
+        SecretId="sharepoint_api"
+    )
+    return json.loads(get_secret_value_response['SecretString'])
 
 
-def convert_date(row, date_col):
-    """
-    Allow TypeError to resolve as "None", since that means the field is empty.
-    ValueError should still fail, because that means the date was formatted incorrectly.
-    """
+def get_sharepoint_graph_data():
+    """Get new access_token from Azure, use it to make request to endpoint"""
+    response = get_sharepoint_secret()
+    app = msal.ConfidentialClientApplication(
+        response["client_id"],
+        authority=AUTHORITY,
+        client_credential=response["client_secret"]
+    )
+    result = app.acquire_token_for_client(scopes=SCOPE)
+    graph_data = requests.get(
+        SHAREPOINT_ENDPOINT,
+        headers={"Authorization": "Bearer " + result["access_token"]}
+    ).json()
+    return graph_data
+
+
+def get_allowed_events():
+    for row in get_sharepoint_graph_data()["items"]:
+        if (row["fields"]["AStatus"] in PERMITTED_STATUS):
+            yield row
+
+
+def convert_date(event_item, date_col):
     try:
         return dt.datetime.strptime(
-            str(row[get_tepp_headers()[date_col]]), "%Y-%m-%d %H:%M:%S"
+            str(event_item["fields"][date_col]), "%Y-%m-%dT%H:%M:%SZ"
         ).strftime("%Y-%m-%d")
     except TypeError:
         return None
 
 
-def get_first_name(row):
+def get_a_name(event_item, n):
     try:
-        return row[get_tepp_headers()["Contact Name (First and Last)"]].partition(" ")[
-            0
+        return event_item["fields"]["oogt"].partition(" ")[
+            n
         ]
     except AttributeError:
         return None
 
 
-def get_last_name(row):
-    try:
-        return row[get_tepp_headers()["Contact Name (First and Last)"]].partition(" ")[
-            -1
-        ]
-    except AttributeError:
-        return None
-
-
-def get_tepp_contact_info(row):
+def get_tepp_contact_info(event_item):
     contact = {}
-    contact["firstname"] = get_first_name(row)
+    contact["firstname"] = get_a_name(event_item, 0)
     contact["title"] = None
-    contact["lastname"] = get_last_name(row)
-    contact["phone"] = row[get_tepp_headers()["Contact Phone Number"]]
-    contact["post"] = row[get_tepp_headers()["City (Organization)"]]
-    contact["email"] = row[get_tepp_headers()["Contact Email"]]
+    contact["lastname"] = get_a_name(event_item, -1)
+    contact["phone"] = event_item["fields"]["ContactPhoneNumber"]
+    contact["post"] = event_item["fields"]["qcfm"]
+    contact["email"] = event_item["fields"]["Contact_x0020_Email"]
     return contact
 
 
-def get_tepp_venue_info(row):
+def get_tepp_description(event_item):
+    some_description = event_item["fields"]["Show_x0020_Description"]
+    soup = BeautifulSoup(some_description, "html.parser")
+    return soup.text
+
+
+def get_tepp_attribute(event_item, attribute):
+    try:
+        return event_item["fields"][attribute]
+    except KeyError:
+        return None
+
+
+def get_tepp_venue(event_item):
     venue = {}
-    venue["city"] = row[get_tepp_headers()["Event Location - City"]]
-    venue["state"] = row[get_tepp_headers()["Event Location - State (U.S. Only)"]]
-    venue["country"] = row[get_tepp_headers()["Event Location - Country"]]
+    venue["city"] = get_tepp_attribute(event_item, "Event_x0020_Location_x0020__x0020")
+    venue["state"] = get_tepp_attribute(event_item, "Event_x0020_Location_x0020__x002")
+    venue["country"] = event_item["fields"]["Country"]
     location_array = [venue["city"], venue["state"], venue["country"]]
     venue["location"] = ", ".join([str(item) for item in location_array if item])
     return venue
 
 
-def generate_event_id(row):
-    m = hashlib.sha1()
-    unique_list = [
-        row[get_tepp_headers()["Event Name"]],
-        convert_date(row, "Event Start Date"),
-        convert_date(row, "Event End Date"),
-        row[get_tepp_headers()["Event Location - City"]],
-    ]
-    m.update("".join([str(item) for item in unique_list if item]).encode())
-    return m.hexdigest()
+def generate_eventid(event_item):
+    return event_item["fields"]["@odata.etag"].partition(",")[
+        0
+    ].replace('"', "")
 
 
-def get_tepp_industry(row):
-    if row[get_tepp_headers()["Primary Industry"]]:
-        return [row[get_tepp_headers()["Primary Industry"]]]
-    else:
-        return []
+def make_tepp_event(event_item):
+    event = {}
+    event["eventid"] = generate_eventid(event_item)
+    event["eventname"] = event_item["fields"]["Title"]
+    event["detaildesc"] = get_tepp_description(event_item)
+    event["url"] = event_item["fields"]["Organizer_x0020_Website"]
+    event["evstartdt"] = convert_date(event_item, "pu1v")
+    event["evenddt"] = convert_date(event_item, "u6gh")
+    event["venues"] = [get_tepp_venue(event_item)]
+    event["contacts"] = [get_tepp_contact_info(event_item)]
+    event["industries"] = get_tepp_attribute(event_item, "Primary_x0020_Industry")
+    event["eventtype"] = "Trade Events Partnership Program"
+    event["registrationlink"] = None
+    event["cost"] = None
+    event["registrationtitle"] = None
+    return event
 
 
 def get_tepp_events():
     events = []
-    worksheet = get_tepp_worksheet()
-    permitted_status = [
-        "MOA Received",
-        "Waiting on End of Show Report",
-        "Event Completed",
-    ]
-    for row in worksheet.iter_rows(min_row=2, values_only=True):
-        if row[get_tepp_headers()["Status"]] in permitted_status:
-            event = {}
-            event["eventid"] = generate_event_id(row)
-            event["industries"] = get_tepp_industry(row)
-            event["evenddt"] = convert_date(row, "Event End Date")
-            event["url"] = row[get_tepp_headers()["Show Website"]]
-            event["eventtype"] = "Trade Events Partnership Program"
-            event["evstartdt"] = convert_date(row, "Event Start Date")
-            event["registrationlink"] = None
-            event["contacts"] = [get_tepp_contact_info(row)]
-            event["detaildesc"] = row[get_tepp_headers()["Show Description"]]
-            event["eventname"] = row[get_tepp_headers()["Event Name"]]
-            event["venues"] = [get_tepp_venue_info(row)]
-            event["cost"] = None
-            event["registrationtitle"] = None
-            events.append(event)
-    print(f"Found {len(events):d} TEPP items in the spreadsheet")
+    for i in get_allowed_events():
+        events.append(make_tepp_event(i))
+    print(f"Found {len(events):d} TEPP items in SharePoint")
     return events
 
 
