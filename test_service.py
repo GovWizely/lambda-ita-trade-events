@@ -1,5 +1,6 @@
+import json
+
 import vcr
-from openpyxl import load_workbook
 
 import service
 
@@ -71,24 +72,33 @@ def test_ita_events():
 
 
 def test_tepp_events(monkeypatch):
-    workbook = load_workbook("sample_tepp.xlsx")
 
     def mockreturn():
-        first_sheet = workbook.sheetnames[0]
-        return workbook[first_sheet]
+        with open("test_TEPP_SharePoint.json", "r") as r:
+            return json.load(r)
 
-    monkeypatch.setattr(service, "get_tepp_worksheet", mockreturn)
+    monkeypatch.setattr(service, "get_sharepoint_graph_data", mockreturn)
 
     entries = service.get_tepp_events()
-    assert len(entries) == 32
+    assert len(entries) == 28
     expected_entry = {
-        "eventid": "0ddc7422238d453c18f3f643e9181788caf06257",
-        "industries": ["Design & Construction"],
-        "evenddt": "2020-02-07",
-        "url": "blank",
-        "eventtype": "Trade Events Partnership Program",
+        "eventid": "41a9b56e-4866-4239-8bbd-cfae978c26ce",
+        "eventname": "World of Concrete 2020",
+        "detaildesc": "​At World of Concrete, find all the products, resources and valuable "
+        "information necessary to strengthen your business. This is the commercial construction "
+        "industry’s first, largest and most important annual international event for concrete and "
+        "masonry professionals across the globe!​",
+        "url": "https://www.worldofconcrete.com/en/info.html",
         "evstartdt": "2020-02-04",
-        "registrationlink": None,
+        "evenddt": "2020-02-07",
+        "venues": [
+            {
+                "city": "Las Vegas",
+                "state": "NV",
+                "country": "USA",
+                "location": "Las Vegas, NV, USA",
+            }
+        ],
         "contacts": [
             {
                 "firstname": "Jackie",
@@ -99,17 +109,12 @@ def test_tepp_events(monkeypatch):
                 "email": "jackie.james@informa.com",
             }
         ],
-        "detaildesc": None,
-        "eventname": "World of Concrete 2020",
-        "venues": [
-            {
-                "city": "Las Vegas",
-                "state": "NV",
-                "country": "USA",
-                "location": "Las Vegas, NV, USA",
-            }
+        "industries": [
+            "Design & Construction",
         ],
+        "eventtype": "Trade Events Partnership Program",
+        "registrationlink": None,
         "cost": None,
-        "registrationtitle": None,
+        "registrationtitle": None
     }
     assert entries[0] == expected_entry

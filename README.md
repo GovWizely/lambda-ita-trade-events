@@ -6,7 +6,7 @@
 
 This project provides an AWS Lambda that creates a single JSON document from two sources:
 * the XML endpoint at [http://emenuapps.ita.doc.gov/ePublic/GetEventXML?StartDT={0}&EndDT={1}](http://emenuapps.ita.doc.gov/ePublic/GetEventXML?StartDT={0}&EndDT={1})  
-* an Excel spreadsheet of Trade Events Partnership Program (TEPP) events in the S3 bucket  
+* the SharePoint endpoint at [https://itaisinternationaltrade.sharepoint.com/teams/ITA/EventsManagement/Lists/TEPP%20Applications/AllItems.aspx](https://itaisinternationaltrade.sharepoint.com/teams/ITA/EventsManagement/Lists/TEPP%20Applications/AllItems.aspx) for Trade Events Partnership Program (TEPP) events  
 
 It uploads that JSON file to a S3 bucket.
 
