@@ -80,9 +80,9 @@ def test_tepp_events(monkeypatch):
     monkeypatch.setattr(service, "get_sharepoint_graph_data", mockreturn)
 
     entries = service.get_tepp_events()
-    assert len(entries) == 28
+    assert len(entries) == 29
     expected_entry = {
-        "eventid": "41a9b56e-4866-4239-8bbd-cfae978c26ce",
+        "eventid": "c43a4532-f7c9-493c-ad69-d9fabdd424a3",
         "eventname": "World of Concrete 2020",
         "detaildesc": "​At World of Concrete, find all the products, resources and valuable "
         "information necessary to strengthen your business. This is the commercial construction "
