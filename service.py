@@ -134,8 +134,8 @@ SCOPE = ["https://graph.microsoft.com/.default"]
 AUTHORITY = "https://login.microsoftonline.com/a1d183f2-6c7b-4d9a-b994-5f2f31b3f780"
 SHAREPOINT_ENDPOINT = (
     "https://graph.microsoft.com/beta/sites/itaisinternationaltrade.sharepoint.com"
-    ",e3ca10b9-b2f5-4b4d-8e79-f9f941ce4e88,05699979-3835-44f6-9d66-304a643dfc8e/"
-    "lists/TEPP%20Applications?expand=columns,items(expand=fields)"
+    ",04a0935b-f459-4fe4-9e92-934a7fc75845,bfa89772-5e48-4ee8-8d09-09bd96bf04c3/"
+    "lists/2d9a7dde-0495-41c6-b09c-0bbf11a92662/items?expand=fields"
 )
 
 PERMITTED_STATUS = [
@@ -175,7 +175,7 @@ def get_sharepoint_graph_data():
 
 
 def get_allowed_events():
-    for row in get_sharepoint_graph_data()["items"]:
+    for row in get_sharepoint_graph_data()["value"]:
         if (row["fields"]["AStatus"] in PERMITTED_STATUS):
             yield row
 
