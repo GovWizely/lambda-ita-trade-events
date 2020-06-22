@@ -3,4 +3,4 @@ bs4==0.0.1
 DateTime==4.3
 msal==1.3.0
 python-lambda==11.7.1
-requests==2.23.0
+requests==2.24.0
