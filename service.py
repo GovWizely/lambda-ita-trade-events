@@ -203,30 +203,23 @@ def get_tepp_contact_info(event_item):
     contact["firstname"] = get_a_name(event_item, 0)
     contact["title"] = None
     contact["lastname"] = get_a_name(event_item, -1)
-    contact["phone"] = event_item["fields"]["ContactPhoneNumber"]
-    contact["post"] = event_item["fields"]["qcfm"]
-    contact["email"] = event_item["fields"]["Contact_x0020_Email"]
+    contact["phone"] = event_item["fields"].get("ContactPhoneNumber")
+    contact["post"] = event_item["fields"].get("qcfm")
+    contact["email"] = event_item["fields"].get("Contact_x0020_Email")
     return contact
 
 
 def get_tepp_description(event_item):
-    some_description = event_item["fields"]["Show_x0020_Description"]
+    some_description = event_item["fields"].get("Show_x0020_Description")
     soup = BeautifulSoup(some_description, "html.parser")
     return soup.text
 
 
-def get_tepp_attribute(event_item, attribute):
-    try:
-        return event_item["fields"][attribute]
-    except KeyError:
-        return None
-
-
 def get_tepp_venue(event_item):
     venue = {}
-    venue["city"] = get_tepp_attribute(event_item, "Event_x0020_Location_x0020__x0020")
-    venue["state"] = get_tepp_attribute(event_item, "Event_x0020_Location_x0020__x002")
-    venue["country"] = event_item["fields"]["Country"]
+    venue["city"] = event_item["fields"].get("Event_x0020_Location_x0020__x0020")
+    venue["state"] = event_item["fields"].get("Event_x0020_Location_x0020__x002")
+    venue["country"] = event_item["fields"].get("Country")
     location_array = [venue["city"], venue["state"], venue["country"]]
     venue["location"] = ", ".join([str(item) for item in location_array if item])
     return venue
@@ -241,14 +234,14 @@ def generate_eventid(event_item):
 def make_tepp_event(event_item):
     event = {}
     event["eventid"] = generate_eventid(event_item)
-    event["eventname"] = event_item["fields"]["Title"]
+    event["eventname"] = event_item["fields"].get("Title")
     event["detaildesc"] = get_tepp_description(event_item)
-    event["url"] = event_item["fields"]["Organizer_x0020_Website"]
+    event["url"] = event_item["fields"].get("Organizer_x0020_Website")
     event["evstartdt"] = convert_date(event_item, "pu1v")
     event["evenddt"] = convert_date(event_item, "u6gh")
     event["venues"] = [get_tepp_venue(event_item)]
     event["contacts"] = [get_tepp_contact_info(event_item)]
-    event["industries"] = get_tepp_attribute(event_item, "Primary_x0020_Industry")
+    event["industries"] = event_item["fields"].get("Primary_x0020_Industry")
     event["eventtype"] = "Trade Events Partnership Program"
     event["registrationlink"] = None
     event["cost"] = None
