@@ -210,9 +210,12 @@ def get_tepp_contact_info(event_item):
 
 
 def get_tepp_description(event_item):
-    some_description = event_item["fields"].get("Show_x0020_Description")
-    soup = BeautifulSoup(some_description, "html.parser")
-    return soup.text
+    try:
+        some_description = event_item["fields"].get("Show_x0020_Description")
+        soup = BeautifulSoup(some_description, "html.parser")
+        return soup.text
+    except TypeError:
+        return None
 
 
 def get_tepp_venue(event_item):
